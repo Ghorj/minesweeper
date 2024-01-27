@@ -109,7 +109,7 @@ class Sentence():
         if len(self.cells) == self.count:
             return self.cells
         else:
-            return None
+            return set()
 
     def known_safes(self) -> set:
         """
@@ -119,7 +119,7 @@ class Sentence():
         if self.count == 0:
             return self.cells
         else:
-            return None
+            return set()
 
     def mark_mine(self, cell):
         """
@@ -207,24 +207,31 @@ class MinesweeperAI():
         # we need to get the neighbors
         neighbors = set()
         
+        # split the tuple in its coordinates
         i, j = cell
 
+        # check cells from (i -1, j -1) to (i + 1, j + 1)
         for x in range(i - 1, i + 2):
 
             for y in range(j - 1, j + 2):
-
+                
+                # if the cell is not on the board don't add to the neighbors
                 if 0 <= x < self.height and 0 <= y < self.width:
                     coord = (x, y)
+
+                    # if the coordinates don't match with the cell, add to neighbors
                     if coord != cell:
                         neighbors.add(coord)
 
-        repeat_neighbors = []
+        # initiate repeat_neighbors list and new count
+        repeat_neighbors = set()
 
+        # check if the neighbors are known mines or safe and update the sentence
         for neighbor in neighbors:
-            if neighbor in self.moves_made:
-                repeat_neighbors.append(neighbor)
+            if neighbor in self.safes:
+                repeat_neighbors.add(neighbor)
             elif neighbor in self.mines:
-                repeat_neighbors.append(neighbor)
+                repeat_neighbors.add(neighbor)
                 count -= 1
         
         for old_neighbor in repeat_neighbors:
@@ -233,35 +240,92 @@ class MinesweeperAI():
         # add new sentence to the knowledge base                
         self.knowledge.append(Sentence(neighbors, count))
 
-        know_copy = self.knowledge.copy()
-        new_mines = set()
-        new_safes = set()
-
-        # mark any additional cells as safe or mines if it can be concluded from the knowledge base
-        for sentence in know_copy:
-            
-            # the positions are safe
-            if sentence.count == 0:
-                for unit in sentence.cells:
-                    new_safes.add(unit)
-            
-            # the positions have mines
-            if len(sentence.cells) == sentence.count:
-                for item in sentence.cells:
-                    new_mines.add(item)
-
-            # if sentence included in another sentence
-            for other in know_copy:
-                if sentence.cells in other.cells:
-                    other.cells = other.cells - sentence.cells
-                    other.count -= sentence.count
+        # create a copy of the knowledge base to iterate over it
+        knowledge_original = self.knowledge.copy()
+        knowledge_modified = self.knowledge.copy()
         
-        for mine in new_mines:
-            self.mark_mine(mine)
         
-        for safe in new_safes:
-            self.mark_safe(safe)
+        # loop here
+        while True:
+            
+            # initialize set of new safes and new mines
+            new_safes = set()
+            new_mines = set()
 
+            # first check if any sentences give conclusions straight away
+            for sentence_orig in knowledge_original:
+
+                # if we know they are all safe cells (count == 0)
+                if sentence_orig.count == 0:
+                    
+                    # add cells to new_safes
+                    for cell in sentence_orig.cells:
+                        new_safes.add(cell)
+
+                    # remove phrase from knowledge
+                    knowledge_modified.remove(sentence_orig)
+                
+                # if we know all cells are mines
+                elif sentence_orig.count == len(sentence_orig.cells):
+
+                    # mark cells as mines
+                    for cell in sentence_orig.cells:
+                        new_mines.add(cell)
+
+                    # remove phrase from self.knowledge
+                    knowledge_modified.remove(sentence_orig)
+            
+            for safe_cell in new_safes:
+                self.mark_safe(safe_cell)
+
+            for mine_cell in new_mines:
+                self.mark_mine(mine_cell)
+
+            # intialize new_sentences list to store new and old sentences
+            new_sentences = []
+            old_sentences = []
+
+            # iterate between knowledge_original and knowledge_modified to compare them
+            for sentence_orig in knowledge_original: # modificada
+
+                for sentence_modif in knowledge_modified: # antigua
+                    
+                    # if sentence contained in phrase
+                    if sentence_modif.cells in sentence_orig.cells and sentence_modif.cells != sentence_orig.cells:
+                        
+                        # add to old_sentences list to remove later
+                        old_sentences.append(sentence_orig)
+
+                        new_cells = sentence_orig.cells - sentence_modif.cells
+                        new_count = sentence_orig.count - sentence_modif.count
+
+                        new_sentences.append(Sentence(new_cells, new_count))
+            
+            # remove old sentences from the knowledge base
+            for old in old_sentences:
+                knowledge_modified.remove(old)
+
+            # add new sentences to the knowledge base
+            for new in new_sentences:
+                knowledge_modified.append(new)
+
+            # check if the knowledge base hasn't changed and if so break the loop
+            if knowledge_modified == knowledge_original:
+                break
+
+            else:
+                knowledge_original = knowledge_modified
+            
+        self.knowledge = knowledge_modified
+        ###### DEBUG
+        print("//")
+        print("moves made: ", self.moves_made)
+        print("mines: ", self.mines)
+        print("safes: ", self.safes)
+        for sentence in self.knowledge:
+            print(sentence.cells, "=", sentence.count)
+
+        
             
 
     def make_safe_move(self):
@@ -283,12 +347,11 @@ class MinesweeperAI():
                 if element not in self.moves_made:
                     options.append(element)
             
-            if len(options) >= 1:
-                option = random.choice(options)
-
-                return(option)
-            else:
+            try:
+                return random.choice(options)
+            except IndexError:
                 return None
+
 
     
 
@@ -300,9 +363,16 @@ class MinesweeperAI():
             2) are not known to be mines
         """
         while True:
+            # check end game
+            if (len(self.mines) + len(self.safes)) == ((self.height) * (self.width)):
+                return None
+            
             y = random.randrange(self.height)
             x = random.randrange(self.width)
             move = (y, x)
 
             if move not in self.moves_made and move not in self.mines:
                 return move
+            
+
+        
