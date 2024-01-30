@@ -130,7 +130,6 @@ class Sentence():
             self.cells.remove(cell)
             self.count -= 1
 
-
     def mark_safe(self, cell):
         """
         Updates internal knowledge representation given the fact that
@@ -140,8 +139,6 @@ class Sentence():
             self.cells.remove(cell)
 
         
-
-
 class MinesweeperAI():
     """
     Minesweeper game player
@@ -180,7 +177,6 @@ class MinesweeperAI():
         self.safes.add(cell)
         for sentence in self.knowledge:
             sentence.mark_safe(cell)
-
 
     def add_knowledge(self, cell, count):
         """
@@ -239,11 +235,10 @@ class MinesweeperAI():
 
         # add new sentence to the knowledge base                
         self.knowledge.append(Sentence(neighbors, count))
-
+        
         # create a copy of the knowledge base to iterate over it
         knowledge_original = self.knowledge.copy()
         knowledge_modified = self.knowledge.copy()
-        
         
         # loop here
         while True:
@@ -251,6 +246,9 @@ class MinesweeperAI():
             # initialize set of new safes and new mines
             new_safes = set()
             new_mines = set()
+
+            # initialize list of sentences to be removed
+            sentences_to_remove = []
 
             # first check if any sentences give conclusions straight away
             for sentence_orig in knowledge_original:
@@ -263,35 +261,41 @@ class MinesweeperAI():
                         new_safes.add(cell)
 
                     # remove phrase from knowledge
-                    knowledge_modified.remove(sentence_orig)
+                    sentences_to_remove.append(sentence_orig)
                 
                 # if we know all cells are mines
                 elif sentence_orig.count == len(sentence_orig.cells):
 
-                    # mark cells as mines
+                    # add cells to new_mines
                     for cell in sentence_orig.cells:
                         new_mines.add(cell)
 
                     # remove phrase from self.knowledge
-                    knowledge_modified.remove(sentence_orig)
+                    sentences_to_remove.append(sentence_orig)
             
+            # mark safe_cells as safe
             for safe_cell in new_safes:
                 self.mark_safe(safe_cell)
 
+            # mark mine_cells as mines
             for mine_cell in new_mines:
                 self.mark_mine(mine_cell)
+
+            # remove sentences from sentences_to_remove
+            for remove_sentence in sentences_to_remove:
+                knowledge_modified.remove(remove_sentence)
 
             # intialize new_sentences list to store new and old sentences
             new_sentences = []
             old_sentences = []
 
             # iterate between knowledge_original and knowledge_modified to compare them
-            for sentence_orig in knowledge_original: # modificada
+            for sentence_orig in knowledge_original:
 
-                for sentence_modif in knowledge_modified: # antigua
+                for sentence_modif in knowledge_modified:
                     
                     # if sentence contained in phrase
-                    if sentence_modif.cells in sentence_orig.cells and sentence_modif.cells != sentence_orig.cells:
+                    if sentence_modif.cells.issubset(sentence_orig.cells) and sentence_modif.cells != sentence_orig.cells:
                         
                         # add to old_sentences list to remove later
                         old_sentences.append(sentence_orig)
@@ -299,7 +303,7 @@ class MinesweeperAI():
                         new_cells = sentence_orig.cells - sentence_modif.cells
                         new_count = sentence_orig.count - sentence_modif.count
 
-                        new_sentences.append(Sentence(new_cells, new_count))
+                        new_sentences.append(Sentence(set(new_cells), new_count))
             
             # remove old sentences from the knowledge base
             for old in old_sentences:
@@ -317,16 +321,6 @@ class MinesweeperAI():
                 knowledge_original = knowledge_modified
             
         self.knowledge = knowledge_modified
-        ###### DEBUG
-        print("//")
-        print("moves made: ", self.moves_made)
-        print("mines: ", self.mines)
-        print("safes: ", self.safes)
-        for sentence in self.knowledge:
-            print(sentence.cells, "=", sentence.count)
-
-        
-            
 
     def make_safe_move(self):
         """
@@ -352,9 +346,6 @@ class MinesweeperAI():
             except IndexError:
                 return None
 
-
-    
-
     def make_random_move(self):
         """
         Returns a move to make on the Minesweeper board.
@@ -373,6 +364,3 @@ class MinesweeperAI():
 
             if move not in self.moves_made and move not in self.mines:
                 return move
-            
-
-        
